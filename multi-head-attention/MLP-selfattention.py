@@ -83,9 +83,9 @@ class My_Model(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(input_dim,input_dim),
             nn.ReLU(),
-            nn.Linear(input_dim,5),
-            nn.ReLU(),
-            nn.Linear(5,input_dim)
+            nn.MultiheadAttention(embed_dim=10,num_heads=1),
+            nn.Linear(10,1),
+            nn.ReLU()
         )
         
     def forward(self,x):

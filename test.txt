@@ -1,6 +1,0 @@
-github vscode
-github账户
-git下载
-git init 
-git remote
-确认时需要备注名字 再同步可以选择不同的路径

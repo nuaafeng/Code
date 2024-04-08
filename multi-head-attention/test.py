@@ -59,7 +59,7 @@ class multi_head_attention(nn.Module):
         return pred
 
 #训练器
-""" def trainer(train_loader,valid_loader,model,config,device):
+def trainer(train_loader,valid_loader,model,config,device):
     if not os.path.isdir('./models'):
         os.mkdir('./models') # Create directory of saving models.
     optimizer = optim.SGD(net.parameters(),config['learning_rate'])
@@ -76,6 +76,6 @@ b= a[0:1000,:]
 b= b.view(4,250,32) #reshape
 net = multi_head_attention(d_model,n_head)
 output = net(b,b,b)
-print(output, output.shape) """
+print(output, output.shape)
 attention = multi_head_attention()
 out = attention()
