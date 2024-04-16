@@ -35,7 +35,12 @@ class Dataset(Dataset):
     def __len__(self):
         return len(self.x)
 #utility function
-    
+
+def xavier_init(m):
+    if isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight)
+        nn.init.constant_(m.bias, 0.0)# 对模型的所有线性层应用 Xavier 初始化方法
+
 def same_seed(seed): 
     '''Fixes random number generator seeds for reproducibility.'''
     torch.backends.cudnn.deterministic = True
@@ -84,7 +89,7 @@ class My_Model(nn.Module):
             nn.Linear(input_dim,input_dim),
             nn.ReLU()
         )
-        self.attention = nn.MultiheadAttention(embed_dim=10,num_heads=2)
+        self.attention = nn.MultiheadAttention(embed_dim=10,num_heads=1)
         self.out = nn.Linear(10,1)
         self.relu = nn.ReLU()
         
@@ -184,7 +189,9 @@ train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffl
 valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 test_loader = DataLoader(test_dataset, batch_size=config['batch_size'], shuffle=False, pin_memory=True)
 
+
 net = My_Model(input_dim=x_train.shape[1]).to(device)
+net.apply(xavier_init)
 trainer(train_loader, valid_loader, net, config, device)
 
 #测试

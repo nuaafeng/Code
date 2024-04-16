@@ -65,14 +65,13 @@ def predict(test_loader,model,device):
 
 #特征选择
 def select_feat(train_data, valid_data, test_data, select_all=True):
-    y_train, y_valid = train_data[:,[2,3]], valid_data[:,[2,3]]#-1表示倒数第一列
+    y_train, y_valid = train_data[:,-1], valid_data[:,-1]#-1表示倒数第一列
     raw_x_train, raw_x_valid, raw_x_test = train_data[:,:-1], valid_data[:,:-1], test_data
 
     if select_all:
         feat_idx = list(range(raw_x_train.shape[1]))#特征个数
     else:
-        #feat_idx = [8,9,10,11,12,13,14,17,25,28] # TODO: Select suitable feature columns.
-        feat_idx = [0,1]
+        feat_idx = [0,1,2,3,4,5,6,7,8,9,10,11,12] # TODO: Select suitable feature columns.
     return raw_x_train[:,feat_idx], raw_x_valid[:,feat_idx], raw_x_test[:,feat_idx], y_train, y_valid
 
 
@@ -85,7 +84,7 @@ class My_Model(nn.Module):
             nn.ReLU(),
             nn.Linear(32,16),
             nn.ReLU(),
-            nn.Linear(16,2)
+            nn.Linear(16,1)
         )
     def forward(self,x):
         x = self.model(x)
@@ -148,7 +147,7 @@ def trainer(train_loader,valid_loader,net,config,device):
 #配置文档
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 config = {
-    'seed': 102110,      # Your seed number, you can pick your lucky number. :)
+    'seed': 2332030,      # Your seed number, you can pick your lucky number. :)
     'select_all': False,   # Whether to use all features.
     'valid_ratio': 0.2,   # validation_size = train_size * valid_ratio
     'n_epochs': 20000,     # Number of epochs.            
@@ -160,12 +159,15 @@ config = {
 
 #数据加载
 same_seed(config['seed'])
-train_data, test_data = pd.read_excel('./螺旋轨迹训练集.xlsx').values, pd.read_excel('./螺旋轨迹.xlsx').values
+train_data, test_data = pd.read_csv('./密炼数据集/密炼数据1训练集无异常.csv').values, pd.read_csv('./密炼数据集/密炼数据1测试集无异常.csv').values
 train_data, valid_data = train_valid_split(train_data, config['valid_ratio'], config['seed'])
 #标准化
-#scaler = StandardScaler() 
-#train_data, test_data = scaler.fit_transform(train_data), scaler.fit_transform(test_data)
-#train_data, valid_data = scaler.fit_transform(train_data),scaler.fit_transform(valid_data)
+scaler = StandardScaler() 
+valid_data = scaler.fit_transform(valid_data)
+train_data = scaler.fit_transform(train_data)
+scaler1 = StandardScaler() 
+inverse_data = scaler1.fit_transform(test_data[:,[-1]])
+test_data = scaler.fit_transform(test_data)
 print(f"""train_data size: {train_data.shape} 
 valid_data size: {valid_data.shape} 
 test_data size: {test_data.shape}""")
@@ -182,7 +184,7 @@ valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffl
 test_loader = DataLoader(test_dataset, batch_size=config['batch_size'], shuffle=False, pin_memory=True)
 
 net = My_Model(input_dim=x_train.shape[1]).to(device)
-trainer(train_loader, valid_loader, net, config, device)
+#trainer(train_loader, valid_loader, net, config, device)
 
 #测试
 import csv
@@ -197,7 +199,9 @@ def save_pred(preds, file):
 model = My_Model(input_dim=x_train.shape[1]).to(device)
 model.load_state_dict(torch.load(config['save_path']))
 preds = predict(test_loader, model, device)
-preds = preds[:,[0,1]]
-df = pd.DataFrame(preds, columns=['Col1', 'Col2'])
-df.to_csv('output-2.csv', index=False)
+preds = preds.reshape(1000,1)
+preds = scaler1.inverse_transform(preds)
+#preds = preds[:,[0,1]]
+df = pd.DataFrame(preds, columns=['Col1'])
+df.to_csv('pre-mlp-416.csv', index=False)
 #save_pred(preds, 'pred_螺旋轨迹.csv')

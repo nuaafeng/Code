@@ -55,24 +55,25 @@ def train_valid_split(data_set, valid_ratio, seed):
 def predict(test_loader,model,device):
     net.eval()
     preds = []
+    step_pre = 0
     for x in tqdm(test_loader):
         x = x.to(device)
         with torch.no_grad():
             pred = model(x)
             preds.append(pred.detach().cpu())
-    preds = torch.cat(preds,dim=0).numpy()       
+    preds = torch.cat(preds,dim=0).numpy()
     return preds
 
 #特征选择
 def select_feat(train_data, valid_data, test_data, select_all=True):
-    y_train, y_valid = train_data[:,[2,3]], valid_data[:,[2,3]]#-1表示倒数第一列
+    y_train, y_valid = train_data[:,-1], valid_data[:,-1]#-1表示倒数第一列
     raw_x_train, raw_x_valid, raw_x_test = train_data[:,:-1], valid_data[:,:-1], test_data
 
     if select_all:
         feat_idx = list(range(raw_x_train.shape[1]))#特征个数
     else:
-        #feat_idx = [8,9,10,11,12,13,14,17,25,28] # TODO: Select suitable feature columns.
-        feat_idx = [0,1]
+        feat_idx = [8,9,10,11,12,13,14,17,24,25] # TODO: Select suitable feature columns.
+        
     return raw_x_train[:,feat_idx], raw_x_valid[:,feat_idx], raw_x_test[:,feat_idx], y_train, y_valid
 
 
@@ -80,17 +81,18 @@ def select_feat(train_data, valid_data, test_data, select_all=True):
 class My_Model(nn.Module):
     def __init__(self, input_dim):
         super(My_Model,self).__init__()
-        self.model = nn.Sequential(
-            nn.Linear(input_dim,32),
-            nn.ReLU(),
+        self.LSTM = nn.LSTM(input_dim,32,1) #8/32
+        self.linear = nn.Sequential(
             nn.Linear(32,16),
             nn.ReLU(),
-            nn.Linear(16,2)
+            nn.Linear(16,1)
         )
+
     def forward(self,x):
-        x = self.model(x)
-        x = x.squeeze(1)
-        return x
+        out,(h,c) = self.LSTM(x)
+        out = self.linear(out)
+        out = out.squeeze(1) #降维 
+        return out
 
 #训练器
 def trainer(train_loader,valid_loader,net,config,device):
@@ -149,23 +151,23 @@ def trainer(train_loader,valid_loader,net,config,device):
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 config = {
     'seed': 102110,      # Your seed number, you can pick your lucky number. :)
-    'select_all': False,   # Whether to use all features.
+    'select_all': True,   # Whether to use all features.
     'valid_ratio': 0.2,   # validation_size = train_size * valid_ratio
     'n_epochs': 20000,     # Number of epochs.            
-    'batch_size': 256, 
+    'batch_size': 32, 
     'learning_rate': 1e-3,              
     'early_stop': 600,    # If model has not improved for this many consecutive epochs, stop training.     
-    'save_path': './models/model.ckpt'  # Your model will be saved here.
+    'save_path': './models/model-LSTM-32.ckpt'  # Your model will be saved here.
 }
 
 #数据加载
 same_seed(config['seed'])
-train_data, test_data = pd.read_excel('./螺旋轨迹训练集.xlsx').values, pd.read_excel('./螺旋轨迹.xlsx').values
+train_data, test_data = pd.read_csv('./密炼数据集/密炼数据1训练集.csv').values, pd.read_csv('./密炼数据集/密炼数据1测试集.csv').values
 train_data, valid_data = train_valid_split(train_data, config['valid_ratio'], config['seed'])
 #标准化
-#scaler = StandardScaler() 
-#train_data, test_data = scaler.fit_transform(train_data), scaler.fit_transform(test_data)
-#train_data, valid_data = scaler.fit_transform(train_data),scaler.fit_transform(valid_data)
+scaler = StandardScaler() 
+train_data, test_data = scaler.fit_transform(train_data), scaler.fit_transform(test_data)
+train_data, valid_data = scaler.fit_transform(train_data),scaler.fit_transform(valid_data)
 print(f"""train_data size: {train_data.shape} 
 valid_data size: {valid_data.shape} 
 test_data size: {test_data.shape}""")
@@ -190,14 +192,11 @@ def save_pred(preds, file):
     ''' Save predictions to specified file '''
     with open(file, 'w') as fp:
         writer = csv.writer(fp)
-        writer.writerow(['id', 'tested_positive'])
+        writer.writerow(['id', 'Prediction'])
         for i, p in enumerate(preds):
             writer.writerow([i, p])
 
 model = My_Model(input_dim=x_train.shape[1]).to(device)
 model.load_state_dict(torch.load(config['save_path']))
 preds = predict(test_loader, model, device)
-preds = preds[:,[0,1]]
-df = pd.DataFrame(preds, columns=['Col1', 'Col2'])
-df.to_csv('output-2.csv', index=False)
-#save_pred(preds, 'pred_螺旋轨迹.csv')
+save_pred(preds, 'pred-lstm-32.csv')

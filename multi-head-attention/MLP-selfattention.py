@@ -35,7 +35,11 @@ class Dataset(Dataset):
     def __len__(self):
         return len(self.x)
 #utility function
-    
+
+def xavier_init(m):
+    if isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight)
+        nn.init.constant_(m.bias, 0.0)# 对模型的所有线性层应用 Xavier 初始化方法
 def same_seed(seed): 
     '''Fixes random number generator seeds for reproducibility.'''
     torch.backends.cudnn.deterministic = True
@@ -71,7 +75,7 @@ def select_feat(train_data, valid_data, test_data, select_all=True):
     if select_all:
         feat_idx = list(range(raw_x_train.shape[1]))#特征个数
     else:
-        feat_idx = [8,9,10,11,12,13,14,17,25,28] # TODO: Select suitable feature columns.
+        feat_idx = [8,9,10,11,12,13,14,17,25] # TODO: Select suitable feature columns.
         
     return raw_x_train[:,feat_idx], raw_x_valid[:,feat_idx], raw_x_test[:,feat_idx], y_train, y_valid
 
@@ -80,16 +84,27 @@ def select_feat(train_data, valid_data, test_data, select_all=True):
 class My_Model(nn.Module):
     def __init__(self, input_dim):
         super(My_Model,self).__init__()
+        self.relu = nn.ReLU()
+        self.w_q = nn.Linear(input_dim,input_dim)
+        self.w_k = nn.Linear(input_dim,input_dim)
+        self.w_v = nn.Linear(input_dim,input_dim)
+        self.w_combine = nn.Linear(input_dim,input_dim)
+        self.softmax = nn.Softmax(dim=1)
         self.model = nn.Sequential(
-            nn.Linear(input_dim,input_dim),
-            nn.ReLU(),
-            nn.MultiheadAttention(embed_dim=10,num_heads=1),
-            nn.Linear(10,1),
-            nn.ReLU()
+            nn.Linear(9,1),
         )
-        
+        self.batchnorm = nn.BatchNorm1d(num_features=9)
     def forward(self,x):
-        x = self.model(x)
+        q = self.w_q(x)
+        k = q
+        v = q
+        #q = x
+        #k = v = q
+        score = q @ k.transpose(0,1)
+        score = self.softmax(score) @ v
+        score = self.batchnorm(score)
+        attention = self.w_combine(score)
+        x = self.model(attention)
         x = x.squeeze(1)
         return x
 
@@ -149,14 +164,14 @@ def trainer(train_loader,valid_loader,net,config,device):
 #配置文档
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 config = {
-    'seed': 102110,      # Your seed number, you can pick your lucky number. :)
+    'seed': 621100,      # Your seed number, you can pick your lucky number. :)
     'select_all': False,   # Whether to use all features.
     'valid_ratio': 0.2,   # validation_size = train_size * valid_ratio
-    'n_epochs': 20000,     # Number of epochs.            
+    'n_epochs': 50000,     # Number of epochs.            
     'batch_size': 256, 
-    'learning_rate': 1e-3,              
-    'early_stop': 600,    # If model has not improved for this many consecutive epochs, stop training.     
-    'save_path': './models/model.ckpt'  # Your model will be saved here.
+    'learning_rate': 1e-4,              
+    'early_stop': 1000,    # If model has not improved for this many consecutive epochs, stop training.     
+    'save_path': './models/model-maple1.ckpt'  # Your model will be saved here.
 }
 
 #数据加载
@@ -183,6 +198,7 @@ valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffl
 test_loader = DataLoader(test_dataset, batch_size=config['batch_size'], shuffle=False, pin_memory=True)
 
 net = My_Model(input_dim=x_train.shape[1]).to(device)
+net.apply(xavier_init)
 trainer(train_loader, valid_loader, net, config, device)
 
 #测试
@@ -198,4 +214,4 @@ def save_pred(preds, file):
 model = My_Model(input_dim=x_train.shape[1]).to(device)
 model.load_state_dict(torch.load(config['save_path']))
 preds = predict(test_loader, model, device)
-save_pred(preds, 'pred_MLP.csv')
+save_pred(preds, 'pred_maple1.csv')
