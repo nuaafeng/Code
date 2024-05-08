@@ -1,0 +1,12 @@
+tmux new -s <session-name>              新建会话
+tmux detach                            分离会话
+tmux ls                                查看当前所有的Tmux会话
+tmux a -t 0        链接到某个会话       使用会话编号
+tmux a -t <session-name>               使用会话名称
+tmux kill-session -t 0                 使用编号
+tmux kill-session -t <session-name>     使用会话名称
+tmux switch -t 0                       如果在一个会话中，可以使用switch切换会话
+tmux switch -t <session-name>          使用会话名称
+tmux rename-session -t 0 <new-name>     重命名会话
+
+tensorboard --logdir ./xxxx --port=6007
